@@ -145,6 +145,7 @@ func (server *ApiServer) Routes() *mux.Router {
 
 func (server *ApiServer) PopulateConfig(filename string) {
 	file, err := os.Open(filename)
+	defer file.Close()
 	logger := server.Logger
 	if err != nil {
 		logger.Err(err).Str("config", filename).Msg("Error reading config file")

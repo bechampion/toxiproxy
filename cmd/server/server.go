@@ -87,7 +87,13 @@ func run() error {
 	}
 
 	if len(cli.config) > 0 {
-		server.PopulateConfig(cli.config)
+
+		go func() {
+			for {
+				time.Sleep(1 * time.Second)
+				server.PopulateConfig(cli.config)
+			}
+		}()
 	}
 
 	addr := net.JoinHostPort(cli.host, cli.port)

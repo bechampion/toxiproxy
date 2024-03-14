@@ -83,6 +83,7 @@ func (collection *ProxyCollection) PopulateJson(
 	// Check for valid input before creating any proxies
 	t := true
 	for i := range input {
+		println(input[i].Name)
 		if len(input[i].Name) < 1 {
 			return nil, joinError(fmt.Errorf("name at proxy %d", i+1), ErrMissingField)
 		}
@@ -95,7 +96,21 @@ func (collection *ProxyCollection) PopulateJson(
 	}
 
 	proxies := make([]*Proxy, 0, len(input))
+	tempinputmap := map[string]bool{}
+	//lol soz
+	for _,xx := range input {
+		tempinputmap[xx.Name]=true
+	}
 
+	if (len(tempinputmap) != len(collection.proxies)){
+		for _,v := range collection.proxies {
+			if _,ok := tempinputmap[v.Name] ; !ok {
+				delete(collection.proxies,v.Name)
+
+			}
+
+		}
+	}
 	for i := range input {
 		proxy := NewProxy(server, input[i].Name, input[i].Listen, input[i].Upstream)
 		err = collection.AddOrReplace(proxy, *input[i].Enabled)
