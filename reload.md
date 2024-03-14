@@ -22,7 +22,7 @@ Proxy start with this conf file [proxy.conf](./proxy.conf) that looks like:
 
 
 And as you can see the loaded proxies look like:
-[proxies](./img/allproxies.png)
+![proxies](./img/allproxies.png)
 
 
 ## Removing a proxy:
@@ -40,10 +40,10 @@ Conf file now looks like:
 ```
 
 And the element is removed from the conf :
-[modifiedproxies](./img/lessproxies.png)
+![modifiedproxies](./img/lessproxies.png)
 
 
-
+# The implementation of this is quite rudimentary
 
 
 
