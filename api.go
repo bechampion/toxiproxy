@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -143,17 +143,11 @@ func (server *ApiServer) Routes() *mux.Router {
 	return r
 }
 
-func (server *ApiServer) PopulateConfig(filename string) {
-	file, err := os.Open(filename)
-	defer file.Close()
+func (server *ApiServer) PopulateConfig(data io.Reader) {
 	logger := server.Logger
+	proxies, err := server.Collection.PopulateJson(server, data)
 	if err != nil {
-		logger.Err(err).Str("config", filename).Msg("Error reading config file")
-		return
-	}
-
-	proxies, err := server.Collection.PopulateJson(server, file)
-	if err != nil {
+		fmt.Println(err)
 		logger.Err(err).Msg("Failed to populate proxies from file")
 	} else {
 		logger.Info().Int("proxies", len(proxies)).Msg("Populated proxies from file")

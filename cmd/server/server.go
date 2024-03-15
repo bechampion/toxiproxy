@@ -1,9 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"flag"
-	"bytes"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -16,9 +17,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"strings"
+
 	"github.com/Shopify/toxiproxy/v2"
 	"github.com/Shopify/toxiproxy/v2/collectors"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -93,35 +95,32 @@ func run() error {
 	}
 
 	if len(cli.config) > 0 {
-		if strings.Contains(cli.config, "s3://") {
-			parts := strings.Split(cli.config, "s3://")
-			bk:= strings.Split(parts[1], "/")
-			sess, _ := session.NewSession(&aws.Config{
-				Region: aws.String("us-east-1"), // Change to your desired region
-			})
-
-			// Create an S3 service client
-			svc := s3.New(sess)
-
-			// Prepare input for GetObject operation
-			input := &s3.GetObjectInput{
-				Bucket: aws.String(bk[0]),
-				Key:    aws.String(bk[1]),
-			}
-			// Get the object from S3
-			result, _ := svc.GetObject(input)
-
-
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(result.Body)
-		myFileContentAsString := buf.String()
-		println(myFileContentAsString)
-		}
+		var config io.Reader
 
 		go func() {
 			for {
+				if strings.Contains(cli.config, "s3://") {
+					parts := strings.Split(cli.config, "s3://")
+					bk := strings.Split(parts[1], "/")
+					sess, _ := session.NewSession()
+					svc := s3.New(sess)
+					input := &s3.GetObjectInput{
+						Bucket: aws.String(bk[0]),
+						Key:    aws.String(bk[1]),
+					}
+					result, _ := svc.GetObject(input)
+					config = result.Body
+				} else {
+					logger := server.Logger
+					file, err := os.Open(cli.config)
+					config = bufio.NewReader(file)
+					defer file.Close()
+					if err != nil {
+						logger.Err(err).Str("config", cli.config).Msg("Error reading config file")
+					}
+				}
 				time.Sleep(1 * time.Second)
-				server.PopulateConfig(cli.config)
+				server.PopulateConfig(config)
 			}
 		}()
 	}

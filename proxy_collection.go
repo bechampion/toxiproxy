@@ -75,15 +75,11 @@ func (collection *ProxyCollection) PopulateJson(
 		Enabled *bool `json:"enabled"` // Overrides Proxy field to make field nullable
 	}{}
 
-	err := json.NewDecoder(data).Decode(&input)
-	if err != nil {
-		return nil, joinError(err, ErrBadRequestBody)
-	}
+	json.NewDecoder(data).Decode(&input)
 
 	// Check for valid input before creating any proxies
 	t := true
 	for i := range input {
-		println(input[i].Name)
 		if len(input[i].Name) < 1 {
 			return nil, joinError(fmt.Errorf("name at proxy %d", i+1), ErrMissingField)
 		}
@@ -111,6 +107,7 @@ func (collection *ProxyCollection) PopulateJson(
 
 		}
 	}
+    var err error
 	for i := range input {
 		proxy := NewProxy(server, input[i].Name, input[i].Listen, input[i].Upstream)
 		err = collection.AddOrReplace(proxy, *input[i].Enabled)
