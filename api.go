@@ -363,6 +363,42 @@ func (server *ApiServer) ToxicIndex(response http.ResponseWriter, request *http.
 	}
 }
 
+func (server *ApiServer) TTT(input interface{}) {
+	fmt.Printf("%T\n", input )
+	switch v := input.(type) {
+	case *http.Request:
+		// If it's an http.Request, read the body and print it
+		bodyBytes, err := io.ReadAll(v.Body)
+		if err != nil {
+			fmt.Println("Error reading request body:", err)
+			return
+		}
+		fmt.Printf("Request Body: %s\n", string(bodyBytes))
+		defer v.Body.Close()
+	case io.Reader:
+		bodyBytes, err := io.ReadAll(v)
+		if err != nil {
+			fmt.Println("Error reading reader:", err)
+			return
+		}
+		fmt.Printf("Reader Body: %v\n", string(bodyBytes))
+	default:
+		fmt.Println("Unsupported type")
+	}
+}
+func (server *ApiServer) TToxicCreate(proxyName string, data io.Reader) {
+
+	proxy, err := server.Collection.Get(proxyName)
+	if err != nil {
+		println(err)
+	}
+
+	_, err = proxy.Toxics.AddToxicJson(data)
+	if err != nil {
+		println(err)
+	}
+
+}
 func (server *ApiServer) ToxicCreate(response http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 
@@ -377,6 +413,7 @@ func (server *ApiServer) ToxicCreate(response http.ResponseWriter, request *http
 	}
 
 	data, err := json.Marshal(toxic)
+	fmt.Println(string(data))
 	if server.apiError(response, err) {
 		return
 	}

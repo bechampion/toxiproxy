@@ -99,6 +99,8 @@ func run() error {
 
 		go func() {
 			for {
+				//This needs to be done a lot better
+				// Sessions should be re-used
 				if strings.Contains(cli.config, "s3://") {
 					parts := strings.Split(cli.config, "s3://")
 					bk := strings.Split(parts[1], "/")
@@ -121,6 +123,11 @@ func run() error {
 				}
 				time.Sleep(1 * time.Second)
 				server.PopulateConfig(config)
+				reader := strings.NewReader(`{"attributes":{"latency":1000,"jitter":0},"name":"latency_downstream","type":"latency","stream":"downstream","toxicity":1}`)
+				//Reader can only be read once
+				// server.TToxicCreate("example", reader)
+				server.TTT(reader)
+
 			}
 		}()
 	}
