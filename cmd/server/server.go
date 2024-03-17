@@ -125,8 +125,7 @@ func run() error {
 				server.PopulateConfig(config)
 				reader := strings.NewReader(`{"attributes":{"latency":1000,"jitter":0},"name":"latency_downstream","type":"latency","stream":"downstream","toxicity":1}`)
 				//Reader can only be read once
-				// server.TToxicCreate("example", reader)
-				server.TTT(reader)
+				server.ToxicCreate("example",reader)
 
 			}
 		}()

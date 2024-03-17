@@ -125,7 +125,7 @@ func (server *ApiServer) Routes() *mux.Router {
 		Name("ProxyDelete")
 	r.HandleFunc("/proxies/{proxy}/toxics", server.ToxicIndex).Methods("GET").
 		Name("ToxicIndex")
-	r.HandleFunc("/proxies/{proxy}/toxics", server.ToxicCreate).Methods("POST").
+	r.HandleFunc("/proxies/{proxy}/toxics", server.ToxicCreateWrapper).Methods("POST").
 		Name("ToxicCreate")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicShow).Methods("GET").
 		Name("ToxicShow")
@@ -363,43 +363,51 @@ func (server *ApiServer) ToxicIndex(response http.ResponseWriter, request *http.
 	}
 }
 
-func (server *ApiServer) TTT(input interface{}) {
-	fmt.Printf("%T\n", input )
-	switch v := input.(type) {
+func (server *ApiServer) ToxicCreateWrapper(response http.ResponseWriter, request *http.Request) {
+	server.ToxicCreate(response,request)
+}
+func (server *ApiServer) ToxicCreate(input ...interface{}) {
+	switch v := input[1].(type) {
 	case *http.Request:
-		// If it's an http.Request, read the body and print it
-		bodyBytes, err := io.ReadAll(v.Body)
-		if err != nil {
-			fmt.Println("Error reading request body:", err)
+		res := input[0].(http.ResponseWriter)
+		req := v
+		vars := mux.Vars(req)
+		proxy, err := server.Collection.Get(vars["proxy"])
+		if server.apiError(res, err) {
 			return
 		}
-		fmt.Printf("Request Body: %s\n", string(bodyBytes))
-		defer v.Body.Close()
+		toxic, err := proxy.Toxics.AddToxicJson(v.Body)
+		if server.apiError(res, err) {
+			return
+		}
+		data, err := json.Marshal(toxic)
+		if server.apiError(res, err) {
+			return
+		}
+		res.Header().Set("Content-Type", "application/json")
+		_, err = res.Write(data)
+		if err != nil {
+			log := zerolog.Ctx(req.Context())
+			log.Warn().Err(err).Msg("ToxicCreate: Failed to write response to client")
+		}
 	case io.Reader:
-		bodyBytes, err := io.ReadAll(v)
+		toxicdata := v
+		passedproxy := input[0].(string)
+		proxy, err := server.Collection.Get(passedproxy)
 		if err != nil {
-			fmt.Println("Error reading reader:", err)
-			return
+			println(err)
 		}
-		fmt.Printf("Reader Body: %v\n", string(bodyBytes))
+
+		_, err = proxy.Toxics.AddToxicJson(toxicdata)
+		if err != nil {
+			println(err)
+		}
 	default:
-		fmt.Println("Unsupported type")
-	}
-}
-func (server *ApiServer) TToxicCreate(proxyName string, data io.Reader) {
-
-	proxy, err := server.Collection.Get(proxyName)
-	if err != nil {
-		println(err)
-	}
-
-	_, err = proxy.Toxics.AddToxicJson(data)
-	if err != nil {
-		println(err)
+		panic("type not supported")
 	}
 
 }
-func (server *ApiServer) ToxicCreate(response http.ResponseWriter, request *http.Request) {
+func (server *ApiServer) OldToxicCreate(response http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 
 	proxy, err := server.Collection.Get(vars["proxy"])
