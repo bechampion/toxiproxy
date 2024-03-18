@@ -127,7 +127,7 @@ func (server *ApiServer) Routes() *mux.Router {
 		Name("ToxicIndex")
 	r.HandleFunc("/proxies/{proxy}/toxics", server.ToxicCreateWrapper).Methods("POST").
 		Name("ToxicCreate")
-	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicShow).Methods("GET").
+	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicShowWrapper).Methods("GET").
 		Name("ToxicShow")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicUpdate).Methods("POST", "PATCH").
 		Name("ToxicUpdate")
@@ -364,7 +364,7 @@ func (server *ApiServer) ToxicIndex(response http.ResponseWriter, request *http.
 }
 
 func (server *ApiServer) ToxicCreateWrapper(response http.ResponseWriter, request *http.Request) {
-	server.ToxicCreate(response,request)
+	server.ToxicCreate(response, request)
 }
 func (server *ApiServer) ToxicCreate(input ...interface{}) {
 	switch v := input[1].(type) {
@@ -434,7 +434,54 @@ func (server *ApiServer) OldToxicCreate(response http.ResponseWriter, request *h
 	}
 }
 
-func (server *ApiServer) ToxicShow(response http.ResponseWriter, request *http.Request) {
+func (server *ApiServer) ToxicShowWrapper(response http.ResponseWriter, request *http.Request) {
+	server.ToxicShow(response, request)
+}
+func (server *ApiServer) ToxicShow(input ...interface{}) interface{} {
+	switch v := input[1].(type) {
+	case *http.Request:
+		res := input[0].(http.ResponseWriter)
+		req := v
+		vars := mux.Vars(req)
+		proxy, err := server.Collection.Get(vars["proxy"])
+		if server.apiError(res, err) {
+			return false
+		}
+		toxic := proxy.Toxics.GetToxic(vars["toxic"])
+		if toxic == nil {
+			server.apiError(res, ErrToxicNotFound)
+			return false
+		}
+		data, err := json.Marshal(toxic)
+		if server.apiError(res, err) {
+			return false
+		}
+		res.Header().Set("Content-Type", "application/json")
+		_, err = res.Write(data)
+		if err != nil {
+			log := zerolog.Ctx(req.Context())
+			log.Warn().Err(err).Msg("ToxicShow: Failed to write response to client")
+			return false
+		}
+		return true
+	case string:
+		passedproxy := input[0].(string)
+		passedtoxic := input[1].(string)
+		proxy, err := server.Collection.Get(passedproxy)
+		if err != nil {
+			println(err)
+		}
+
+		toxic := proxy.Toxics.GetToxic(passedtoxic)
+		if toxic != nil {
+			return true
+		}
+		return false
+	default:
+		panic("type not supported")
+	}
+}
+func (server *ApiServer) OldToxicShow(response http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 
 	proxy, err := server.Collection.Get(vars["proxy"])

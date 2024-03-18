@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -114,7 +115,15 @@ func (collection *ProxyCollection) PopulateJson(
 		if err != nil {
 			return proxies, err
 		}
-
+		for t := range input[i].FileToxics {
+			toxicData,err := json.Marshal(input[i].FileToxics[t])
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("%v", server.ToxicShow(input[i].Name,input[i].FileToxics[t].Name))
+			toxic:= strings.NewReader(string(toxicData))
+			server.ToxicCreate(input[i].Name,toxic)
+		}
 		proxies = append(proxies, proxy)
 	}
 	return proxies, err

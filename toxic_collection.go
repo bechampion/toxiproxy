@@ -94,6 +94,7 @@ func (c *ToxicCollection) AddToxicJson(data io.Reader) (*toxics.ToxicWrapper, er
 	}
 
 	err := json.NewDecoder(io.TeeReader(data, &buffer)).Decode(wrapper)
+	fmt.Printf("%v",err)
 	if err != nil {
 		return nil, joinError(err, ErrBadRequestBody)
 	}
