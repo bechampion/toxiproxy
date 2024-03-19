@@ -123,9 +123,6 @@ func run() error {
 				}
 				time.Sleep(1 * time.Second)
 				server.PopulateConfig(config)
-				// reader := strings.NewReader(`{"attributes":{"latency":1000,"jitter":0},"name":"latency_downstream","type":"latency","stream":"downstream","toxicity":1}`)
-				//Reader can only be read once
-				// server.ToxicCreate("example",reader)
 
 			}
 		}()

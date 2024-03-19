@@ -16,23 +16,23 @@ import (
 // client and upstream.
 //
 // Client <-> toxiproxy <-> Upstream.
-type Toxics struct{
-
+type Toxics struct {
+}
+type FileToxics struct {
+	Attributes map[string]int `json:"attributes"`
+	Name       string         `json:"name"`
+	Type       string         `json:"type"`
+	Stream     string         `json:"stream"`
+	Toxicity   int            `json:"toxicity"`
 }
 type Proxy struct {
 	sync.Mutex
 
-	Name     string `json:"name"`
-	Listen   string `json:"listen"`
-	Upstream string `json:"upstream"`
-	Enabled  bool   `json:"enabled"`
-	FileToxics []struct{
-		Attributes map[string]int `json:"attributes"`
-		Name string `json:"name"`
-		Type string `json:"type"`
-		Stream string `json:"stream"`
-		Toxicity int `json:"toxicity"`
-	} `json:"toxics"`
+	Name       string `json:"name"`
+	Listen     string `json:"listen"`
+	Upstream   string `json:"upstream"`
+	Enabled    bool   `json:"enabled"`
+	FileToxics []FileToxics `json:"toxics"`
 
 	listener net.Listener
 	started  chan error

@@ -109,21 +109,31 @@ func (collection *ProxyCollection) PopulateJson(
 		}
 	}
     var err error
+	toxicsmap := make(map[string]FileToxics)
 	for i := range input {
 		proxy := NewProxy(server, input[i].Name, input[i].Listen, input[i].Upstream)
 		err = collection.AddOrReplace(proxy, *input[i].Enabled)
 		if err != nil {
 			return proxies, err
 		}
-		for t := range input[i].FileToxics {
-			toxicData,err := json.Marshal(input[i].FileToxics[t])
+		for _,ft := range input[i].FileToxics {
+			toxicsmap[ft.Name]=ft
+
+		}
+		for tdk,tdv := range server.ToxicDiff(input[i].Name,input[i].FileToxics){
+			toxicData,err := json.Marshal(toxicsmap[tdk])
+			toxicreader:= strings.NewReader(string(toxicData))
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("%v", server.ToxicShow(input[i].Name,input[i].FileToxics[t].Name))
-			toxic:= strings.NewReader(string(toxicData))
-			server.ToxicCreate(input[i].Name,toxic)
+			if tdv == "add"{
+				server.ToxicCreate(input[i].Name,toxicreader)
+			}
+			if tdv == "update"{
+				server.ToxicUpdate(input[i].Name , tdk, toxicreader)
+			}
 		}
+
 		proxies = append(proxies, proxy)
 	}
 	return proxies, err

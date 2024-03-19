@@ -129,7 +129,7 @@ func (server *ApiServer) Routes() *mux.Router {
 		Name("ToxicCreate")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicShowWrapper).Methods("GET").
 		Name("ToxicShow")
-	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicUpdate).Methods("POST", "PATCH").
+	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicUpdateWrapper).Methods("POST", "PATCH").
 		Name("ToxicUpdate")
 	r.HandleFunc("/proxies/{proxy}/toxics/{toxic}", server.ToxicDelete).Methods("DELETE").
 		Name("ToxicDelete")
@@ -407,32 +407,6 @@ func (server *ApiServer) ToxicCreate(input ...interface{}) {
 	}
 
 }
-func (server *ApiServer) OldToxicCreate(response http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
-
-	proxy, err := server.Collection.Get(vars["proxy"])
-	if server.apiError(response, err) {
-		return
-	}
-
-	toxic, err := proxy.Toxics.AddToxicJson(request.Body)
-	if server.apiError(response, err) {
-		return
-	}
-
-	data, err := json.Marshal(toxic)
-	fmt.Println(string(data))
-	if server.apiError(response, err) {
-		return
-	}
-
-	response.Header().Set("Content-Type", "application/json")
-	_, err = response.Write(data)
-	if err != nil {
-		log := zerolog.Ctx(request.Context())
-		log.Warn().Err(err).Msg("ToxicCreate: Failed to write response to client")
-	}
-}
 
 func (server *ApiServer) ToxicShowWrapper(response http.ResponseWriter, request *http.Request) {
 	server.ToxicShow(response, request)
@@ -481,61 +455,105 @@ func (server *ApiServer) ToxicShow(input ...interface{}) interface{} {
 		panic("type not supported")
 	}
 }
-func (server *ApiServer) OldToxicShow(response http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
+func (server *ApiServer) ToxicList(input ...interface{}) map[string]*toxics.ToxicWrapper {
+	switch v := input[0].(type) {
+	// case *http.Request: TODO
+	case string:
+		passedproxy := v
+		toxicwrappermap := make(map[string]*toxics.ToxicWrapper)
+		proxy, err := server.Collection.Get(passedproxy)
+		if err != nil {
+			println(err)
+		}
 
-	proxy, err := server.Collection.Get(vars["proxy"])
-	if server.apiError(response, err) {
-		return
-	}
+		toxicarray := proxy.Toxics.GetToxicArray()
+		if toxicarray == nil {
+			return nil
+		}
+		for x := range toxicarray {
+			tw := toxicarray[x].(*toxics.ToxicWrapper)
+			toxicwrappermap[tw.Name] = tw
 
-	toxic := proxy.Toxics.GetToxic(vars["toxic"])
-	if toxic == nil {
-		server.apiError(response, ErrToxicNotFound)
-		return
-	}
-
-	data, err := json.Marshal(toxic)
-	if server.apiError(response, err) {
-		return
-	}
-
-	response.Header().Set("Content-Type", "application/json")
-	_, err = response.Write(data)
-	if err != nil {
-		log := zerolog.Ctx(request.Context())
-		log.Warn().Err(err).Msg("ToxicShow: Failed to write response to client")
+		}
+		return toxicwrappermap
+	default:
+		panic("type not supported")
 	}
 }
+func (server *ApiServer) ToxicDiff(proxyname string, configtoxics []FileToxics) map[string]string {
+	// This only works for latency
+	toxiclist := server.ToxicList(proxyname)
+	toxicdiff := make(map[string]string)
+	for _, ct := range configtoxics {
+		flag := 0
+		if _, ok := toxiclist[ct.Name]; ok {
+			latency := toxiclist[ct.Name].Toxic.(*toxics.LatencyToxic)
+			// Im checking only latency and jitter this needs some better code
+			if latency.Latency != int64(ct.Attributes["latency"]) {
+				flag = 1
+			}
+			if latency.Jitter != int64(ct.Attributes["jitter"]) {
+				flag = 1
+			}
+			if flag != 0 {
+				toxicdiff[ct.Name]="update"
+			}
 
-func (server *ApiServer) ToxicUpdate(response http.ResponseWriter, request *http.Request) {
-	log := zerolog.Ctx(request.Context())
-	if request.Method == "POST" {
-		log.Warn().Msg("ToxicUpdate: HTTP method POST is depercated. Use HTTP PATCH instead.")
+		} else {
+			toxicdiff[ct.Name]="add"
+		}
 	}
+	return toxicdiff
+}
 
-	vars := mux.Vars(request)
+func (server *ApiServer) ToxicUpdateWrapper(response http.ResponseWriter, request *http.Request) {
+	server.ToxicUpdate(response, request)
+}
+func (server *ApiServer) ToxicUpdate(input ...interface{}) interface{} {
+	switch v := input[1].(type) {
+	case string:
+		proxyname:= input[0].(string)
+		toxic :=  input[1].(string)
+		toxicdata := input[2].(io.Reader)
+		proxy, err := server.Collection.Get(proxyname)
+		if err != nil {
+			println(err)
+		}
+		proxy.Toxics.UpdateToxicJson(toxic,toxicdata)
+	case *http.Request:
+		res := input[0].(http.ResponseWriter)
+		req := v
+		log := zerolog.Ctx(req.Context())
+		if req.Method == "POST" {
+			log.Warn().Msg("ToxicUpdate: HTTP method POST is depercated. Use HTTP PATCH instead.")
+		}
 
-	proxy, err := server.Collection.Get(vars["proxy"])
-	if server.apiError(response, err) {
-		return
+		vars := mux.Vars(req)
+
+		proxy, err := server.Collection.Get(vars["proxy"])
+		if server.apiError(res, err) {
+			return nil
+		}
+
+		toxic, err := proxy.Toxics.UpdateToxicJson(vars["toxic"], req.Body)
+		if server.apiError(res, err) {
+			return nil
+		}
+
+		data, err := json.Marshal(toxic)
+		if server.apiError(res, err) {
+			return nil
+		}
+
+		res.Header().Set("Content-Type", "application/json")
+		_, err = res.Write(data)
+		if err != nil {
+			log.Warn().Err(err).Msg("ToxicUpdate: Failed to write response to client")
+		}
+	default:
+		panic("here Type not supported")
 	}
-
-	toxic, err := proxy.Toxics.UpdateToxicJson(vars["toxic"], request.Body)
-	if server.apiError(response, err) {
-		return
-	}
-
-	data, err := json.Marshal(toxic)
-	if server.apiError(response, err) {
-		return
-	}
-
-	response.Header().Set("Content-Type", "application/json")
-	_, err = response.Write(data)
-	if err != nil {
-		log.Warn().Err(err).Msg("ToxicUpdate: Failed to write response to client")
-	}
+	return nil
 }
 
 func (server *ApiServer) ToxicDelete(response http.ResponseWriter, request *http.Request) {
