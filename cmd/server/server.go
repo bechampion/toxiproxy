@@ -121,7 +121,7 @@ func run() error {
 						logger.Err(err).Str("config", cli.config).Msg("Error reading config file")
 					}
 				}
-				time.Sleep(1 * time.Second)
+				time.Sleep(10 * time.Second)
 				server.PopulateConfig(config)
 
 			}

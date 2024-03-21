@@ -95,8 +95,8 @@ func (collection *ProxyCollection) PopulateJson(
 	proxies := make([]*Proxy, 0, len(input))
 	tempinputmap := map[string]bool{}
 	//lol soz
-	for _,xx := range input {
-		tempinputmap[xx.Name]=true
+	for _,pe:= range input {
+		tempinputmap[pe.Name]=true
 	}
 
 	if (len(tempinputmap) != len(collection.proxies)){
@@ -112,6 +112,7 @@ func (collection *ProxyCollection) PopulateJson(
 	toxicsmap := make(map[string]FileToxics)
 	for i := range input {
 		proxy := NewProxy(server, input[i].Name, input[i].Listen, input[i].Upstream)
+		//Here we need to check the proxy is different before we do this ,  as this can have some overhead
 		err = collection.AddOrReplace(proxy, *input[i].Enabled)
 		if err != nil {
 			return proxies, err
