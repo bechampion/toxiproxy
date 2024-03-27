@@ -488,6 +488,7 @@ func (server *ApiServer) ToxicDiff(proxyname string, configtoxics []FileToxics) 
 		flag := 0
 		if _, ok := toxiclist[ct.Name]; ok {
 			latency := toxiclist[ct.Name].Toxic.(*toxics.LatencyToxic)
+			fmt.Printf("Da toxic %v\n", toxiclist[ct.Name].Type)
 			// Im checking only latency and jitter this needs some better code
 			if latency.Latency != int64(ct.Attributes["latency"]) {
 				flag = 1

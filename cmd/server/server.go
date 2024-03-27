@@ -96,21 +96,22 @@ func run() error {
 
 	if len(cli.config) > 0 {
 		var config io.Reader
+		var s3session *s3.S3
+		if strings.Contains(cli.config, "s3://") {
+			s3session = setupAwsSession()
+		}
 
 		go func() {
 			for {
 				//This needs to be done a lot better
-				// Sessions should be re-used
 				if strings.Contains(cli.config, "s3://") {
 					parts := strings.Split(cli.config, "s3://")
 					bk := strings.Split(parts[1], "/")
-					sess, _ := session.NewSession()
-					svc := s3.New(sess)
 					input := &s3.GetObjectInput{
 						Bucket: aws.String(bk[0]),
 						Key:    aws.String(bk[1]),
 					}
-					result, _ := svc.GetObject(input)
+					result, _ := s3session.GetObject(input)
 					config = result.Body
 				} else {
 					logger := server.Logger
@@ -121,7 +122,7 @@ func run() error {
 						logger.Err(err).Str("config", cli.config).Msg("Error reading config file")
 					}
 				}
-				time.Sleep(10 * time.Second)
+				time.Sleep(1 * time.Second)
 				server.PopulateConfig(config)
 
 			}
@@ -147,6 +148,11 @@ func run() error {
 	return nil
 }
 
+func setupAwsSession() *s3.S3 {
+	sess, _ := session.NewSession()
+	svc := s3.New(sess)
+	return svc
+}
 func setupLogger() zerolog.Logger {
 	zerolog.TimestampFunc = func() time.Time {
 		return time.Now().UTC()
