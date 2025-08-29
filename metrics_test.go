@@ -33,7 +33,8 @@ func TestProxyMetricsReceivedSentBytes(t *testing.T) {
 
 	actual := prometheusOutput(t, srv, "toxiproxy_proxy")
 
-	expected := []string{
+	// Check that we have the expected byte metrics
+	expectedBytes := []string{
 		`toxiproxy_proxy_received_bytes_total{` +
 			`direction="upstream",listener="localhost:0",` +
 			`proxy="test_proxy_metrics_received_sent_bytes",upstream="upstream"` +
@@ -45,12 +46,28 @@ func TestProxyMetricsReceivedSentBytes(t *testing.T) {
 			`} 5`,
 	}
 
-	if !reflect.DeepEqual(actual, expected) {
+	// Check if we have connection duration metrics
+	var foundBytes []string
+	var foundDuration bool
+	for _, metric := range actual {
+		if strings.Contains(metric, "received_bytes_total") || strings.Contains(metric, "sent_bytes_total") {
+			foundBytes = append(foundBytes, metric)
+		}
+		if strings.Contains(metric, "connection_duration_seconds") {
+			foundDuration = true
+		}
+	}
+
+	if !reflect.DeepEqual(foundBytes, expectedBytes) {
 		t.Fatalf(
-			"\nexpected:\n  [%v]\ngot:\n  [%v]",
-			strings.Join(expected, "\n  "),
-			strings.Join(actual, "\n  "),
+			"\nexpected byte metrics:\n  [%v]\ngot:\n  [%v]",
+			strings.Join(expectedBytes, "\n  "),
+			strings.Join(foundBytes, "\n  "),
 		)
+	}
+
+	if !foundDuration {
+		t.Fatal("Expected connection_duration_seconds metric not found")
 	}
 }
 

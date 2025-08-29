@@ -17,6 +17,23 @@ For more details, see below:
 ### Proxy Metrics
 
 To enable metrics related to toxiproxy internals, use the `-proxy-metrics` flag.
+
+#### toxiproxy_proxy_connection_duration_seconds
+
+A histogram metric that tracks the duration of proxy connections in seconds for each specific proxy.
+
+**Type**
+
+Histogram
+
+**Labels**
+
+| Label     | Description                    | Example               |
+|-----------|--------------------------------|-----------------------|
+| listener  | Listener address of this proxy | 0.0.0.0:8080          |
+| proxy     | Proxy name                     | my-proxy              |
+| upstream  | Upstream address of this proxy | httpbin.org:80        |
+
 #### toxiproxy_proxy_received_bytes_total / toxiproxy_proxy_sent_bytes_total
 
 The total number of bytes received/sent on a given proxy link in a given direction

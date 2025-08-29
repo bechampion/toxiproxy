@@ -136,9 +136,7 @@ func (server *ApiServer) Routes() *mux.Router {
 
 	r.HandleFunc("/version", server.Version).Methods("GET").Name("Version")
 
-	if server.Metrics.anyMetricsEnabled() {
-		r.Handle("/metrics", server.Metrics.handler()).Name("Metrics")
-	}
+	r.Handle("/metrics", server.Metrics.handler()).Name("Metrics")
 
 	return r
 }

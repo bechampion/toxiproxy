@@ -10,6 +10,7 @@ type ProxyMetricCollectors struct {
 
 	ReceivedBytesTotal *prometheus.CounterVec
 	SentBytesTotal     *prometheus.CounterVec
+	ConnectionDuration *prometheus.HistogramVec
 }
 
 func (c *ProxyMetricCollectors) Collectors() []prometheus.Collector {
@@ -41,6 +42,17 @@ func NewProxyMetricCollectors() *ProxyMetricCollectors {
 		},
 		m.proxyLabels)
 	m.collectors = append(m.collectors, m.SentBytesTotal)
+
+	m.ConnectionDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "proxy",
+			Name:      "connection_duration_seconds",
+			Help:      "Duration of proxy connections in seconds",
+			Buckets:   prometheus.DefBuckets,
+		},
+		[]string{"proxy", "listener", "upstream"})
+	m.collectors = append(m.collectors, m.ConnectionDuration)
 
 	return &m
 }

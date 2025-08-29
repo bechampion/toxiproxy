@@ -73,6 +73,7 @@ func (link *ToxicLink) Start(
 	source io.Reader,
 	dest io.WriteCloser,
 ) {
+	startTime := time.Now()
 	logger := link.Logger
 	logger.
 		Debug().
@@ -109,7 +110,7 @@ func (link *ToxicLink) Start(
 		go link.stubs[i].Run(toxic)
 	}
 
-	go link.write(labels, name, server, dest)
+	go link.write(labels, name, server, dest, startTime)
 }
 
 // read copies bytes from a source to the link's input channel.
@@ -139,6 +140,7 @@ func (link *ToxicLink) write(
 	name string,
 	server *ApiServer, // TODO: Replace with AppConfig for Metrics and Logger
 	dest io.WriteCloser,
+	startTime time.Time,
 ) {
 	logger := link.Logger.
 		With().
@@ -161,6 +163,15 @@ func (link *ToxicLink) write(
 	}
 
 	dest.Close()
+
+	// Record connection duration metric
+	if server.Metrics.proxyMetricsEnabled() {
+		duration := time.Since(startTime).Seconds()
+		durationLabels := []string{link.proxy.Name, link.proxy.Listen, link.proxy.Upstream}
+		server.Metrics.ProxyMetrics.ConnectionDuration.
+			WithLabelValues(durationLabels...).Observe(duration)
+	}
+
 	logger.Trace().Msgf("Remove link %s from ToxicCollection", name)
 	link.toxics.RemoveLink(name)
 	logger.Trace().Msgf("RemoveConnection %s from Proxy %s", name, link.proxy.Name)
