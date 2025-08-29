@@ -41,6 +41,7 @@ func (t *LatencyToxic) Pipe(stub *ToxicStub) {
 			select {
 			case <-time.After(sleep):
 				c.Timestamp = c.Timestamp.Add(sleep)
+				c.ArtificialLatency += sleep
 				stub.Output <- c
 			case <-stub.Interrupt:
 				// Exit fast without applying latency.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -164,12 +165,31 @@ func (link *ToxicLink) write(
 
 	dest.Close()
 
-	// Record connection duration metric
+	// Extract connection name by removing direction suffix
+	connectionName := strings.TrimSuffix(strings.TrimSuffix(name, "upstream"), "downstream")
+	
+	// Get artificial latency from this link and accumulate per connection
+	linkArtificialLatency := link.output.GetTotalArtificialLatency()
+	link.toxics.Lock()
+	link.toxics.connectionArtificialLatency[connectionName] += linkArtificialLatency
+	totalConnectionArtificialLatency := link.toxics.connectionArtificialLatency[connectionName]
+	connectionStartTime, hasConnectionStartTime := link.toxics.connectionStartTimes[connectionName]
+	link.toxics.Unlock()
+
+	// Record connection duration metrics
 	if server.Metrics.proxyMetricsEnabled() {
 		duration := time.Since(startTime).Seconds()
 		durationLabels := []string{link.proxy.Name, link.proxy.Listen, link.proxy.Upstream}
 		server.Metrics.ProxyMetrics.ConnectionDuration.
 			WithLabelValues(durationLabels...).Observe(duration)
+		
+		// Record the real connection duration metric only once per connection (when downstream finishes)
+		if strings.HasSuffix(name, "downstream") && hasConnectionStartTime {
+			totalConnectionDuration := time.Since(connectionStartTime).Seconds()
+			realConnectionDuration := totalConnectionDuration - totalConnectionArtificialLatency.Seconds()
+			server.Metrics.ProxyMetrics.RealConnectionDuration.
+				WithLabelValues(durationLabels...).Observe(realConnectionDuration)
+		}
 	}
 
 	logger.Trace().Msgf("Remove link %s from ToxicCollection", name)

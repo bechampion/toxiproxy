@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -25,6 +27,8 @@ type ToxicCollection struct {
 	proxy *Proxy
 	chain [][]*toxics.ToxicWrapper
 	links map[string]*ToxicLink
+	connectionArtificialLatency map[string]time.Duration
+	connectionStartTimes map[string]time.Time
 }
 
 func NewToxicCollection(proxy *Proxy) *ToxicCollection {
@@ -36,6 +40,8 @@ func NewToxicCollection(proxy *Proxy) *ToxicCollection {
 		proxy: proxy,
 		chain: make([][]*toxics.ToxicWrapper, stream.NumDirections),
 		links: make(map[string]*ToxicLink),
+		connectionArtificialLatency: make(map[string]time.Duration),
+		connectionStartTimes: make(map[string]time.Time),
 	}
 	for dir := range collection.chain {
 		collection.chain[dir] = make([]*toxics.ToxicWrapper, 1, toxics.Count()+1)
@@ -200,6 +206,12 @@ func (c *ToxicCollection) StartLink(
 		logger = zerolog.Nop()
 	}
 
+	// Track connection start time when the first link of a connection starts
+	connectionName := strings.TrimSuffix(strings.TrimSuffix(name, "upstream"), "downstream")
+	if _, exists := c.connectionStartTimes[connectionName]; !exists {
+		c.connectionStartTimes[connectionName] = time.Now()
+	}
+
 	link := NewToxicLink(c.proxy, c, direction, logger)
 	link.Start(server, name, input, output)
 	c.links[name] = link
@@ -209,6 +221,13 @@ func (c *ToxicCollection) RemoveLink(name string) {
 	c.Lock()
 	defer c.Unlock()
 	delete(c.links, name)
+	
+	// Clean up connection tracking when downstream link is removed
+	if strings.HasSuffix(name, "downstream") {
+		connectionName := strings.TrimSuffix(strings.TrimSuffix(name, "upstream"), "downstream")
+		delete(c.connectionArtificialLatency, connectionName)
+		delete(c.connectionStartTimes, connectionName)
+	}
 }
 
 // All following functions assume the lock is already grabbed.

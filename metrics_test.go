@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
@@ -23,25 +24,36 @@ func TestProxyMetricsReceivedSentBytes(t *testing.T) {
 
 	proxy := NewProxy(srv, "test_proxy_metrics_received_sent_bytes", "localhost:0", "upstream")
 
-	r := bufio.NewReader(bytes.NewBufferString("hello"))
-	w := &testWriteCloser{
-		bufio.NewWriter(bytes.NewBuffer([]byte{})),
-	}
-	linkName := "testupstream"
-	proxy.Toxics.StartLink(srv, linkName, r, w, stream.Upstream)
-	proxy.Toxics.RemoveLink(linkName)
+	// Test both upstream and downstream links using the same pattern as proxy.go
+	connectionName := "test"
+	r1 := bufio.NewReader(bytes.NewBufferString("hello"))
+	w1 := &testWriteCloser{bufio.NewWriter(bytes.NewBuffer([]byte{}))}
+	proxy.Toxics.StartLink(srv, connectionName+"upstream", r1, w1, stream.Upstream)
+	
+	r2 := bufio.NewReader(bytes.NewBufferString("world"))
+	w2 := &testWriteCloser{bufio.NewWriter(bytes.NewBuffer([]byte{}))}
+	proxy.Toxics.StartLink(srv, connectionName+"downstream", r2, w2, stream.Downstream)
+	
+	// Don't manually call RemoveLink - let the links finish naturally
 
 	actual := prometheusOutput(t, srv, "toxiproxy_proxy")
 
-	// Check that we have the expected byte metrics
+	// Check that we have the expected byte metrics (now from both directions)
 	expectedBytes := []string{
 		`toxiproxy_proxy_received_bytes_total{` +
 			`direction="upstream",listener="localhost:0",` +
 			`proxy="test_proxy_metrics_received_sent_bytes",upstream="upstream"` +
 			`} 5`,
-
 		`toxiproxy_proxy_sent_bytes_total{` +
 			`direction="upstream",listener="localhost:0",` +
+			`proxy="test_proxy_metrics_received_sent_bytes",upstream="upstream"` +
+			`} 5`,
+		`toxiproxy_proxy_received_bytes_total{` +
+			`direction="downstream",listener="localhost:0",` +
+			`proxy="test_proxy_metrics_received_sent_bytes",upstream="upstream"` +
+			`} 5`,
+		`toxiproxy_proxy_sent_bytes_total{` +
+			`direction="downstream",listener="localhost:0",` +
 			`proxy="test_proxy_metrics_received_sent_bytes",upstream="upstream"` +
 			`} 5`,
 	}
@@ -49,15 +61,23 @@ func TestProxyMetricsReceivedSentBytes(t *testing.T) {
 	// Check if we have connection duration metrics
 	var foundBytes []string
 	var foundDuration bool
+	var foundRealDuration bool
 	for _, metric := range actual {
 		if strings.Contains(metric, "received_bytes_total") || strings.Contains(metric, "sent_bytes_total") {
 			foundBytes = append(foundBytes, metric)
 		}
-		if strings.Contains(metric, "connection_duration_seconds") {
+		if strings.Contains(metric, "connection_duration_seconds") && !strings.Contains(metric, "real") {
 			foundDuration = true
+		}
+		if strings.Contains(metric, "real_connection_duration_seconds") {
+			foundRealDuration = true
 		}
 	}
 
+	// Sort both slices for comparison since order may vary
+	sort.Strings(foundBytes)
+	sort.Strings(expectedBytes)
+	
 	if !reflect.DeepEqual(foundBytes, expectedBytes) {
 		t.Fatalf(
 			"\nexpected byte metrics:\n  [%v]\ngot:\n  [%v]",
@@ -68,6 +88,49 @@ func TestProxyMetricsReceivedSentBytes(t *testing.T) {
 
 	if !foundDuration {
 		t.Fatal("Expected connection_duration_seconds metric not found")
+	}
+
+	if !foundRealDuration {
+		t.Fatal("Expected real_connection_duration_seconds metric not found")
+	}
+}
+
+func TestProxyMetricsRealConnectionDuration(t *testing.T) {
+	srv := NewServer(NewMetricsContainer(prometheus.NewRegistry()), zerolog.Nop())
+	srv.Metrics.ProxyMetrics = collectors.NewProxyMetricCollectors()
+
+	proxy := NewProxy(srv, "test_proxy_real_duration_metric", "localhost:0", "upstream")
+
+	// Test both upstream and downstream links using the same pattern as proxy.go  
+	connectionName := "test"
+	r1 := bufio.NewReader(bytes.NewBufferString("hello"))
+	w1 := &testWriteCloser{bufio.NewWriter(bytes.NewBuffer([]byte{}))}
+	proxy.Toxics.StartLink(srv, connectionName+"upstream", r1, w1, stream.Upstream)
+	
+	r2 := bufio.NewReader(bytes.NewBufferString("world"))
+	w2 := &testWriteCloser{bufio.NewWriter(bytes.NewBuffer([]byte{}))}
+	proxy.Toxics.StartLink(srv, connectionName+"downstream", r2, w2, stream.Downstream)
+	
+	// Don't manually call RemoveLink - let the links finish naturally
+
+	actual := prometheusOutput(t, srv, "toxiproxy_proxy")
+
+	// Check that both duration metrics are present
+	var foundRegular, foundReal bool
+	for _, metric := range actual {
+		if strings.HasPrefix(metric, "toxiproxy_proxy_connection_duration_seconds") {
+			foundRegular = true
+		}
+		if strings.HasPrefix(metric, "toxiproxy_proxy_real_connection_duration_seconds") {
+			foundReal = true
+		}
+	}
+
+	if !foundRegular {
+		t.Fatal("Expected connection_duration_seconds metric not found")
+	}
+	if !foundReal {
+		t.Fatal("Expected real_connection_duration_seconds metric not found")
 	}
 }
 

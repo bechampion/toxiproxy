@@ -8,8 +8,9 @@ import (
 
 // Stores a slice of bytes with its receive timestamp.
 type StreamChunk struct {
-	Data      []byte
-	Timestamp time.Time
+	Data               []byte
+	Timestamp          time.Time
+	ArtificialLatency  time.Duration
 }
 
 // Implements the io.WriteCloser interface for a chan []byte.
@@ -24,7 +25,11 @@ func NewChanWriter(output chan<- *StreamChunk) *ChanWriter {
 // Write `buf` as a StreamChunk to the channel. The full buffer is always written, and error
 // will always be nil. Calling `Write()` after closing the channel will panic.
 func (c *ChanWriter) Write(buf []byte) (int, error) {
-	packet := &StreamChunk{make([]byte, len(buf)), time.Now()}
+	packet := &StreamChunk{
+		Data:      make([]byte, len(buf)),
+		Timestamp: time.Now(),
+		ArtificialLatency: 0,
+	}
 	copy(packet.Data, buf) // Make a copy before sending it to the channel
 	c.output <- packet
 	return len(buf), nil
@@ -38,15 +43,21 @@ func (c *ChanWriter) Close() error {
 
 // Implements the io.Reader interface for a chan []byte.
 type ChanReader struct {
-	input     <-chan *StreamChunk
-	interrupt <-chan struct{}
-	buffer    []byte
+	input                  <-chan *StreamChunk
+	interrupt              <-chan struct{}
+	buffer                 []byte
+	totalArtificialLatency time.Duration
 }
 
 var ErrInterrupted = fmt.Errorf("read interrupted by channel")
 
 func NewChanReader(input <-chan *StreamChunk) *ChanReader {
-	return &ChanReader{input, make(chan struct{}), []byte{}}
+	return &ChanReader{
+		input:                  input,
+		interrupt:              make(chan struct{}),
+		buffer:                 []byte{},
+		totalArtificialLatency: 0,
+	}
 }
 
 // Specify a channel that can interrupt a read if it is blocking.
@@ -76,6 +87,7 @@ func (c *ChanReader) Read(out []byte) (int, error) {
 				}
 				return 0, io.EOF
 			}
+			c.totalArtificialLatency += p.ArtificialLatency
 			n2 := copy(out[n:], p.Data)
 			c.buffer = p.Data[n2:]
 			return n + n2, nil
@@ -94,7 +106,13 @@ func (c *ChanReader) Read(out []byte) (int, error) {
 		c.buffer = nil
 		return 0, io.EOF
 	}
+	c.totalArtificialLatency += p.ArtificialLatency
 	n2 := copy(out[n:], p.Data)
 	c.buffer = p.Data[n2:]
 	return n + n2, nil
+}
+
+// GetTotalArtificialLatency returns the total artificial latency accumulated from all chunks read
+func (c *ChanReader) GetTotalArtificialLatency() time.Duration {
+	return c.totalArtificialLatency
 }
