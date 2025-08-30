@@ -1,3 +1,12 @@
+#label_replace(
+  #(toxiproxy_proxy_real_connection_duration_seconds_sum / toxiproxy_proxy_real_connection_duration_seconds_count) * 1000,
+  #"connection_type", "real", "", ""
+#)
+#or
+#label_replace(
+  #(toxiproxy_proxy_connection_duration_seconds_sum / toxiproxy_proxy_connection_duration_seconds_count) * 1000,
+  #"connection_type", "total", "", ""
+#)
 global:
   scrape_interval: 15s
 
