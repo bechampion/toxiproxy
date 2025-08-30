@@ -48,11 +48,12 @@ Histogram
 
 **Labels**
 
-| Label     | Description                    | Example               |
-|-----------|--------------------------------|-----------------------|
-| listener  | Listener address of this proxy | 0.0.0.0:8080          |
-| proxy     | Proxy name                     | my-proxy              |
-| upstream  | Upstream address of this proxy | httpbin.org:80        |
+| Label                  | Description                                | Example               |
+|------------------------|--------------------------------------------|-----------------------|
+| listener               | Listener address of this proxy            | 0.0.0.0:8080          |
+| proxy                  | Proxy name                                 | my-proxy              |
+| upstream               | Upstream address of this proxy            | httpbin.org:80        |
+| configured_latency_ms  | Total configured latency from all toxics  | 5000                  |
 
 #### toxiproxy_proxy_received_bytes_total / toxiproxy_proxy_sent_bytes_total
 

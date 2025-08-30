@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -228,6 +229,27 @@ func (c *ToxicCollection) RemoveLink(name string) {
 		delete(c.connectionArtificialLatency, connectionName)
 		delete(c.connectionStartTimes, connectionName)
 	}
+}
+
+// GetConfiguredLatency returns the total configured latency from all latency toxics
+func (c *ToxicCollection) GetConfiguredLatency() int64 {
+	c.Lock()
+	defer c.Unlock()
+	
+	var totalLatency int64
+	for _, direction := range c.chain {
+		for _, toxic := range direction {
+			if latencyToxic, ok := toxic.Toxic.(*toxics.LatencyToxic); ok {
+				totalLatency += latencyToxic.Latency
+			}
+		}
+	}
+	return totalLatency
+}
+
+// GetConfiguredLatencyLabel returns the total configured latency as a string for Prometheus labels
+func (c *ToxicCollection) GetConfiguredLatencyLabel() string {
+	return strconv.FormatInt(c.GetConfiguredLatency(), 10)
 }
 
 // All following functions assume the lock is already grabbed.

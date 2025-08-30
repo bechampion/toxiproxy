@@ -63,7 +63,7 @@ func NewProxyMetricCollectors() *ProxyMetricCollectors {
 			Help:      "Real duration of proxy connections excluding artificial latency from toxics in seconds",
 			Buckets:   prometheus.DefBuckets,
 		},
-		[]string{"proxy", "listener", "upstream"})
+		[]string{"proxy", "listener", "upstream", "configured_latency_ms"})
 	m.collectors = append(m.collectors, m.RealConnectionDuration)
 
 	return &m

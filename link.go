@@ -187,8 +187,13 @@ func (link *ToxicLink) write(
 		if strings.HasSuffix(name, "downstream") && hasConnectionStartTime {
 			totalConnectionDuration := time.Since(connectionStartTime).Seconds()
 			realConnectionDuration := totalConnectionDuration - totalConnectionArtificialLatency.Seconds()
+			
+			// Add configured latency as a label
+			configuredLatencyLabel := link.toxics.GetConfiguredLatencyLabel()
+			realDurationLabels := append(durationLabels, configuredLatencyLabel)
+			
 			server.Metrics.ProxyMetrics.RealConnectionDuration.
-				WithLabelValues(durationLabels...).Observe(realConnectionDuration)
+				WithLabelValues(realDurationLabels...).Observe(realConnectionDuration)
 		}
 	}
 
